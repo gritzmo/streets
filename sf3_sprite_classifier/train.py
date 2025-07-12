@@ -1,9 +1,44 @@
 import argparse
 from pathlib import Path
+from PIL import Image
 import torch
 from torch import nn, optim
-from torch.utils.data import DataLoader, random_split
-from torchvision import datasets, transforms
+from torch.utils.data import DataLoader, random_split, Dataset
+from torchvision import transforms
+
+
+class SpriteDataset(Dataset):
+    """Dataset that treats each character/action combination as a class."""
+
+    def __init__(self, root: Path, transform=None):
+        self.transform = transform
+        self.samples = []
+        self.class_to_idx = {}
+
+        root = Path(root)
+        for char_dir in sorted(root.iterdir()):
+            if not char_dir.is_dir():
+                continue
+            char = char_dir.name
+            for action_dir in sorted(char_dir.iterdir()):
+                if not action_dir.is_dir():
+                    continue
+                label = f"{char}_{action_dir.name}"
+                idx = self.class_to_idx.setdefault(label, len(self.class_to_idx))
+                for img_path in sorted(action_dir.iterdir()):
+                    if img_path.is_file() and img_path.suffix.lower() in {".png", ".jpg", ".jpeg", ".bmp"}:
+                        self.samples.append((img_path, idx))
+        self.num_classes = len(self.class_to_idx)
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, index):
+        path, label = self.samples[index]
+        image = Image.open(path).convert("RGB")
+        if self.transform:
+            image = self.transform(image)
+        return image, label
 
 
 class SpriteCNN(nn.Module):
@@ -35,8 +70,8 @@ def load_data(data_dir: Path, batch_size: int):
         transforms.Resize((64, 64)),
         transforms.ToTensor(),
     ])
-    dataset = datasets.ImageFolder(data_dir, transform=transform)
-    num_classes = len(dataset.classes)
+    dataset = SpriteDataset(data_dir, transform=transform)
+    num_classes = dataset.num_classes
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
     train_ds, val_ds = random_split(dataset, [train_size, val_size])
@@ -79,7 +114,12 @@ def train(model, train_loader, val_loader, device, epochs, lr):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train sprite classifier")
-    parser.add_argument("--data-dir", type=Path, default=Path("sprites"), help="Path to sprites directory")
+    parser.add_argument(
+        "--data-dir",
+        type=Path,
+        default=Path(__file__).resolve().parent,
+        help="Path to directory containing character folders",
+    )
     parser.add_argument("--epochs", type=int, default=10, help="Number of epochs")
     parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
