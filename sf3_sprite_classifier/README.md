@@ -10,14 +10,29 @@ This project trains a simple CNN to classify Street Fighter III character sprite
 pip install -r requirements.txt
 ```
 
-2. Add training images in `sprites/`, organized into subfolders named after the action labels (e.g. `idle`, `jump`).
+2. Add training images organised by character with action folders inside each
+   character directory. For example:
+
+```
+sf3_sprite_classifier/
+├── akuma/
+│   └── airkick/
+│       ├── akuma-airkick_000.png
+│       └── ...
+├── ryu/
+│   └── hadouken/
+│       └── ryu-hadouken_000.png
+```
+
+During training each label combines the character and action name (e.g.
+`akuma_airkick`).
 
 ## Training
 
 Run the training script:
 
 ```bash
-python train.py --data-dir sprites --epochs 10 --batch-size 32
+python train.py --data-dir path/to/dataset --epochs 10 --batch-size 32
 ```
 
 After training, a `model.pth` file will be created with the trained weights and label mapping.
